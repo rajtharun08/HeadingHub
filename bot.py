@@ -1,7 +1,9 @@
 import os
 import logging
 from dotenv import load_dotenv
-from telegram.ext import ApplicationBuilder
+# we need a few more tools from the bot library.
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # load our secret token from the .env file
 load_dotenv()
@@ -12,20 +14,42 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+
+# --- new part: defining our first command ---
+# command handlers in this library are always 'async' functions.
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """this function runs when the user sends the /start command."""
+    
+    # 'update' contains information about the incoming message, like who sent it.
+    user = update.effective_user
+    
+    # we'll craft a friendly welcome message that uses the user's first name.
+    welcome_message = (
+        f"hey {user.first_name}!\n\n"
+        "i'm headlinehub, your friendly news bot.\n\n"
+        "soon, you'll be able to use the /news command to get the latest headlines."
+    )
+    
+    # and here, we send our message back to the user's chat.
+    await update.message.reply_text(welcome_message)
+
+
 def main():
     """this is where our bot will start running."""
 
-    # first, we get the telegram token from our .env file.
     token = os.getenv("TELEGRAM_TOKEN")
     if not token:
-        # it's crucial to stop if the token isn't found.
         logging.error("telegram token not found in .env file. please add it.")
         return
 
-    # this is the core of the bot, which handles all the updates from telegram.
     application = ApplicationBuilder().token(token).build()
 
-    # we'll register our command handlers here in the next commits.
+    # --- new part: registering the command ---
+    # this line creates a link between the text command '/start' and our 'start' function.
+    start_handler = CommandHandler('start', start)
+    # now, we add this link to our application, so it knows what to do.
+    application.add_handler(start_handler)
+
 
     # this starts the bot and makes it listen for messages.
     logging.info("bot is starting up...")
