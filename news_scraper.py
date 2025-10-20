@@ -2,7 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 import logging
 from textblob import TextBlob
-# we're importing from the new library.
 from deep_translator import GoogleTranslator
 
 # basic logging config.
@@ -15,6 +14,7 @@ HEADERS = {
 
 def get_sentiment_emoji(polarity):
     """assigns an emoji based on a sentiment score."""
+    # using a 0.1 threshold to avoid flagging slightly-off-neutral headlines.
     if polarity > 0.1:
         return "😊"
     elif polarity < -0.1:
@@ -25,18 +25,21 @@ def get_sentiment_emoji(polarity):
 def scrape_and_analyze_headlines(language_code='en'):
     """
     scrapes bbc news, analyzes sentiment, and optionally translates.
-    returns a list of formatted headlines. returns an empty list if anything fails.
+    returns an empty list if anything fails.
     """
     url = "https://www.bbc.com/news"
     formatted_headlines = []
-
+    
     try:
         logging.info(f"fetching news from {url}...")
         response = requests.get(url, headers=HEADERS, timeout=10)
+        # this is important - it'll error out if we get a 404 or 503 response.
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
         
+        # note: this is the most fragile part of the scraper.
+        # the website's html will change, and this selector will need to be updated.
         headlines_html = soup.find_all('h2', {'data-testid': 'card-headline'}, limit=10)
 
         if not headlines_html:
@@ -55,7 +58,7 @@ def scrape_and_analyze_headlines(language_code='en'):
 
             if language_code != 'en':
                 try:
-                    # the way we call translate is slightly different with this new library.
+                    # using deep-translator here because it's more reliable than textblob's.
                     translation = GoogleTranslator(source='auto', target=language_code).translate(headline_text)
                     final_headline_string += f"\n   ➤ {translation}"
                 except Exception as e:
@@ -64,31 +67,20 @@ def scrape_and_analyze_headlines(language_code='en'):
             
             formatted_headlines.append(final_headline_string)
 
+    # catch network-related issues specifically.
     except requests.exceptions.RequestException as e:
         logging.error(f"network error during scraping: {e}")
         return []
+    # catch any other unexpected problems.
     except Exception as e:
         logging.error(f"an unexpected error occurred: {e}")
         return []
 
     return formatted_headlines
 
-# our test block remains the same.
+# this block only runs if you execute `python news_scraper.py` directly.
 if __name__ == '__main__':
-    news_en = scrape_and_analyze_headlines()
-    if news_en:
-        print("\n--- today's top headlines (english) ---")
-        for i, item in enumerate(news_en):
-            print(f"{i+1}. {item}\n")
-    else:
-        print("\ncould not retrieve english news. check the log for details.")
-
-    print("\n" + "="*50 + "\n")
-
-    news_translated = scrape_and_analyze_headlines(language_code='hi')
-    if news_translated:
-        print("\n--- today's top headlines (translated to hindi) ---")
-        for i, item in enumerate(news_translated):
-            print(f"{i+1}. {item}\n")
-    else:
-        print("\ncould not retrieve translated news. check the log for details.")
+    news = scrape_and_analyze_headlines(language_code='hi')
+    if news:
+        for item in news:
+            print(f"{item}\n")
