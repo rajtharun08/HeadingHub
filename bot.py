@@ -28,7 +28,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(welcome_message)
 
 
-# --- new part: a dedicated /help command handler ---
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """sends a message when the command /help is issued."""
     help_text = (
@@ -42,40 +41,40 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """this function runs when the user sends the /news command."""
-    
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-
     language_code = 'en'
     if context.args:
         language_code = context.args[0].lower()
     
-    try:
-        # we'll wrap the scraper call in a try block.
-        headlines = scrape_and_analyze_headlines(language_code)
+    headlines = scrape_and_analyze_headlines(language_code)
+    
+    if not headlines:
+        await update.message.reply_text("sorry, i couldn't retrieve the headlines right now. the news source might be unavailable.")
+        return
         
-        if not headlines:
-            await update.message.reply_text("sorry, i couldn't retrieve the headlines right now. the news source might be unavailable.")
-            return
-            
-        title = f"here are the latest headlines (translated to {language_code}):" if language_code != 'en' else "here are the latest headlines:"
-        response_body = "\n\n".join(headlines)
-        full_response = f"{title}\n\n{response_body}"
-        
-        if len(full_response) > 4096:
-            full_response = full_response[:4090] + "\n..."
+    title = f"here are the latest headlines (translated to {language_code}):" if language_code != 'en' else "here are the latest headlines:"
+    response_body = "\n\n".join(headlines)
+    full_response = f"{title}\n\n{response_body}"
+    
+    if len(full_response) > 4096:
+        full_response = full_response[:4090] + "\n..."
 
-        await update.message.reply_text(full_response)
-        
-    # --- new part: catch errors from the scraper ---
-    # this will specifically catch errors if the user provides a bad language code.
-    except Exception as e:
-        logging.error(f"error processing news command: {e}")
-        await update.message.reply_text(f"sorry, i couldn't process that. did you use a valid language code? (e.g., 'es', 'hi', 'fr')")
+    await update.message.reply_text(full_response)
+
+# --- new part: the global error handler ---
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """logs errors and sends a generic error message to the user."""
+    # we log the full error traceback for ourselves to see in the console.
+    logging.error("exception while handling an update:", exc_info=context.error)
+    
+    # for the user, we'll just send a simple, friendly message.
+    # we check if the update and message exist to avoid another error.
+    if update and update.effective_message:
+        await update.effective_message.reply_text("sorry, something went wrong. please try again in a moment.")
 
 
 def main():
     """this is where our bot will start running."""
-
     token = os.getenv("TELEGRAM_TOKEN")
     if not token:
         logging.error("telegram token not found in .env file. please add it.")
@@ -83,8 +82,12 @@ def main():
 
     application = ApplicationBuilder().token(token).build()
 
+    # --- new part: register the error handler ---
+    # this handler will be called for any unhandled exception in the bot.
+    application.add_error_handler(error_handler)
+
+    # register command handlers
     application.add_handler(CommandHandler('start', start))
-    # register the new /help handler
     application.add_handler(CommandHandler('help', help_command))
     application.add_handler(CommandHandler('news', news))
 
