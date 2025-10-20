@@ -2,8 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import logging
 from textblob import TextBlob
-# we're adding the new, more reliable translator library.
-from googletrans import Translator
+# we're importing from the new library.
+from deep_translator import GoogleTranslator
 
 # basic logging config.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,7 +15,6 @@ HEADERS = {
 
 def get_sentiment_emoji(polarity):
     """assigns an emoji based on a sentiment score."""
-    # using a 0.1 threshold to avoid flagging slightly-off-neutral headlines.
     if polarity > 0.1:
         return "😊"
     elif polarity < -0.1:
@@ -23,7 +22,6 @@ def get_sentiment_emoji(polarity):
     else:
         return "😐"
 
-# we're adding a 'language_code' parameter, which defaults to english ('en').
 def scrape_and_analyze_headlines(language_code='en'):
     """
     scrapes bbc news, analyzes sentiment, and optionally translates.
@@ -31,18 +29,14 @@ def scrape_and_analyze_headlines(language_code='en'):
     """
     url = "https://www.bbc.com/news"
     formatted_headlines = []
-    # create an instance of the translator.
-    translator = Translator()
 
     try:
         logging.info(f"fetching news from {url}...")
         response = requests.get(url, headers=HEADERS, timeout=10)
-        # this is important - it'll error out if we get a 404 or 503 response.
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # note: this selector is the most fragile part of the scraper and may need future updates.
         headlines_html = soup.find_all('h2', {'data-testid': 'card-headline'}, limit=10)
 
         if not headlines_html:
@@ -57,17 +51,14 @@ def scrape_and_analyze_headlines(language_code='en'):
             polarity = blob.sentiment.polarity
             emoji = get_sentiment_emoji(polarity)
             
-            # start with the original english headline and its emoji.
             final_headline_string = f"{headline_text} {emoji}"
 
-            # now, if the user requested a language other than english, we translate.
             if language_code != 'en':
                 try:
-                    # use the new googletrans library for a reliable translation.
-                    translation = translator.translate(headline_text, dest=language_code)
-                    final_headline_string += f"\n   ➤ {translation.text}"
+                    # the way we call translate is slightly different with this new library.
+                    translation = GoogleTranslator(source='auto', target=language_code).translate(headline_text)
+                    final_headline_string += f"\n   ➤ {translation}"
                 except Exception as e:
-                    # if it fails, just add a note and move on without crashing.
                     logging.error(f"could not translate '{headline_text}'. error: {e}")
                     final_headline_string += "\n   ➤ (translation failed)"
             
@@ -82,9 +73,8 @@ def scrape_and_analyze_headlines(language_code='en'):
 
     return formatted_headlines
 
-# we'll update the test block to check both english and a translated language.
+# our test block remains the same.
 if __name__ == '__main__':
-    # first, test the default english version
     news_en = scrape_and_analyze_headlines()
     if news_en:
         print("\n--- today's top headlines (english) ---")
@@ -93,11 +83,9 @@ if __name__ == '__main__':
     else:
         print("\ncould not retrieve english news. check the log for details.")
 
-    # a separator to make the output clear
     print("\n" + "="*50 + "\n")
 
-    # now, let's test the translation with tamil ('ta').
-    news_translated = scrape_and_analyze_headlines(language_code='ta')
+    news_translated = scrape_and_analyze_headlines(language_code='hi')
     if news_translated:
         print("\n--- today's top headlines (translated to hindi) ---")
         for i, item in enumerate(news_translated):
