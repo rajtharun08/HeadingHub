@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# --- new part: import our own scraper function ---
 # this makes the functions in news_scraper.py available here.
 from news_scraper import scrape_and_analyze_headlines
 
@@ -21,35 +20,53 @@ logging.basicConfig(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """this function runs when the user sends the /start command."""
     user = update.effective_user
-    # let's update the welcome message to mention the new command.
+    # let's update the welcome message to explain the new feature.
     welcome_message = (
         f"hey {user.first_name}!\n\n"
-        "i'm headlinehub, your friendly news bot.\n\n"
-        "use the /news command to get the latest headlines with sentiment."
+        "i'm headlinehub, your multilingual news bot.\n\n"
+        "here's how to use me:\n"
+        "  - send /news for headlines in english.\n"
+        "  - send /news <lang_code> for a translation.\n\n"
+        "for example: /news hi (hindi), /news fr (french), or /news ta (tamil)."
     )
     await update.message.reply_text(welcome_message)
 
 
-# --- new part: defining the /news command handler ---
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """this function runs when the user sends the /news command."""
     
-    # let the user know we've received the command and are working on it.
-    await update.message.reply_text("fetching the latest headlines, please wait...")
+    # by default, we'll get english news.
+    language_code = 'en'
     
-    # call our scraper function. by default, this gets english headlines.
-    headlines = scrape_and_analyze_headlines() 
+    # 'context.args' is a list of words sent after the command.
+    if context.args:
+        # we take the first word after the command as our language code.
+        language_code = context.args[0].lower()
+        await update.message.reply_text(f"fetching headlines and translating to '{language_code}', please wait...")
+    else:
+        await update.message.reply_text("fetching the latest english headlines, please wait...")
     
-    # it's important to handle the case where the scraping fails.
+    # now, we pass the chosen language code to our scraper function.
+    headlines = scrape_and_analyze_headlines(language_code) 
+    
     if not headlines:
         await update.message.reply_text("sorry, i couldn't retrieve the headlines right now. please try again later.")
         return
         
-    # if we got headlines, we'll join them together into one big message.
-    # we use two newlines '\n\n' to create a blank line between each headline for readability.
-    response_text = "\n\n".join(headlines)
+    title = f"here are the latest headlines (translated to {language_code}):" if language_code != 'en' else "here are the latest headlines:"
     
-    await update.message.reply_text(response_text)
+    # we'll add extra newlines for spacing between each translated block.
+    response_body = "\n\n".join(headlines)
+    
+    # combine the title and the body for the final message.
+    full_response = f"{title}\n\n{response_body}"
+    
+    # telegram has a message length limit of 4096 characters.
+    # this is the corrected, complete line.
+    if len(full_response) > 4096:
+        full_response = full_response[:4090] + "\n..."
+
+    await update.message.reply_text(full_response)
 
 
 def main():
@@ -62,11 +79,7 @@ def main():
 
     application = ApplicationBuilder().token(token).build()
 
-    # register the /start handler.
     application.add_handler(CommandHandler('start', start))
-    
-    # --- new part: register the /news handler ---
-    # now we link the '/news' command to our new 'news' function.
     application.add_handler(CommandHandler('news', news))
 
     logging.info("bot is starting up...")
