@@ -11,10 +11,12 @@
 here's the bot in action.
 
 **(getting help and instructions)**
-![help command demo](./images/help_command.png)
+<br>
+<img src="./images/help_command.png" width="400">
 
 **(fetching and translating news)**
-![translation demo](./images/translation_example.png)
+<br>
+<img src="./images/translation_example.png" width="400">
 
 ###  Core features
 
