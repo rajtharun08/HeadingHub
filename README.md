@@ -10,13 +10,16 @@
 
 here's the bot in action.
 
-**(getting help and instructions)**
-<br>
-<img src="./images/help_command.png" width="400">
-
-**(fetching and translating news)**
-<br>
-<img src="./images/translation_example.png" width="400">
+<table>
+  <tr>
+    <td align="center"><b>getting help & instructions</b></td>
+    <td align="center"><b>fetching & translating news</b></td>
+  </tr>
+  <tr>
+    <td><img src="./images/help_command.png" alt="help command demo" width="380"></td>
+    <td><img src="./images/translation_example.png" alt="translation demo" width="380"></td>
+  </tr>
+</table>
 
 ###  Core features
 
