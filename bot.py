@@ -2,6 +2,8 @@ import os
 import logging
 from dotenv import load_dotenv
 from telegram import Update
+# we need to import ChatAction to use the typing indicator.
+from telegram.constants import ChatAction
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # this makes the functions in news_scraper.py available here.
@@ -34,27 +36,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """this function runs when the user sends the /news command."""
     
+    # --- new part: send the '... is typing' action ---
+    # this gives the user immediate feedback that the bot is working.
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+
     language_code = 'en'
-    
-    # --- new part: store the initial message in a variable ---
-    # we'll save the message we send so we can edit it later.
-    status_message_text = ""
     
     if context.args:
         language_code = context.args[0].lower()
-        status_message_text = f"fetching headlines and translating to '{language_code}', please wait..."
-    else:
-        status_message_text = "fetching the latest english headlines, please wait..."
     
-    # send the initial "fetching" message and store the result.
-    status_message = await update.message.reply_text(status_message_text)
-
     # now, we pass the chosen language code to our scraper function.
     headlines = scrape_and_analyze_headlines(language_code) 
     
     if not headlines:
-        # if it fails, we edit the status message to show an error.
-        await status_message.edit_text("sorry, i couldn't retrieve the headlines right now. please try again later.")
+        # if it fails, send a simple error message.
+        await update.message.reply_text("sorry, i couldn't retrieve the headlines right now. please try again later.")
         return
         
     title = f"here are the latest headlines (translated to {language_code}):" if language_code != 'en' else "here are the latest headlines:"
@@ -64,9 +60,8 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(full_response) > 4096:
         full_response = full_response[:4090] + "\n..."
 
-    # --- new part: edit the original message instead of sending a new one ---
-    # this replaces "fetching..." with our final list of news.
-    await status_message.edit_text(full_response)
+    # now we just send the final message. we removed the 'edit_text' logic for simplicity with the typing action.
+    await update.message.reply_text(full_response)
 
 
 def main():
