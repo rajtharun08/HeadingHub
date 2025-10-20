@@ -20,7 +20,6 @@ logging.basicConfig(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """this function runs when the user sends the /start command."""
     user = update.effective_user
-    # let's update the welcome message to explain the new feature.
     welcome_message = (
         f"hey {user.first_name}!\n\n"
         "i'm headlinehub, your multilingual news bot.\n\n"
@@ -35,38 +34,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """this function runs when the user sends the /news command."""
     
-    # by default, we'll get english news.
     language_code = 'en'
     
-    # 'context.args' is a list of words sent after the command.
-    if context.args:
-        # we take the first word after the command as our language code.
-        language_code = context.args[0].lower()
-        await update.message.reply_text(f"fetching headlines and translating to '{language_code}', please wait...")
-    else:
-        await update.message.reply_text("fetching the latest english headlines, please wait...")
+    # --- new part: store the initial message in a variable ---
+    # we'll save the message we send so we can edit it later.
+    status_message_text = ""
     
+    if context.args:
+        language_code = context.args[0].lower()
+        status_message_text = f"fetching headlines and translating to '{language_code}', please wait..."
+    else:
+        status_message_text = "fetching the latest english headlines, please wait..."
+    
+    # send the initial "fetching" message and store the result.
+    status_message = await update.message.reply_text(status_message_text)
+
     # now, we pass the chosen language code to our scraper function.
     headlines = scrape_and_analyze_headlines(language_code) 
     
     if not headlines:
-        await update.message.reply_text("sorry, i couldn't retrieve the headlines right now. please try again later.")
+        # if it fails, we edit the status message to show an error.
+        await status_message.edit_text("sorry, i couldn't retrieve the headlines right now. please try again later.")
         return
         
     title = f"here are the latest headlines (translated to {language_code}):" if language_code != 'en' else "here are the latest headlines:"
-    
-    # we'll add extra newlines for spacing between each translated block.
     response_body = "\n\n".join(headlines)
-    
-    # combine the title and the body for the final message.
     full_response = f"{title}\n\n{response_body}"
     
-    # telegram has a message length limit of 4096 characters.
-    # this is the corrected, complete line.
     if len(full_response) > 4096:
         full_response = full_response[:4090] + "\n..."
 
-    await update.message.reply_text(full_response)
+    # --- new part: edit the original message instead of sending a new one ---
+    # this replaces "fetching..." with our final list of news.
+    await status_message.edit_text(full_response)
 
 
 def main():
